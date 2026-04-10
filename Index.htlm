@@ -2,106 +2,183 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Control de Gafas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gafas Inteligentes - Control Técnico</title>
     <style>
-        body { background-color: black; color: #00FF00; font-family: sans-serif; text-align: center; margin: 0; overflow: hidden; }
-        #contenedor-video { width: 100%; height: 55vh; background: #111; display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #333; }
-        video { width: 100%; height: 100%; object-fit: cover; background: black; }
-        .barra-estado { padding: 15px; font-weight: bold; font-size: 16px; background: #000; color: #00FF00; }
-        .controles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 20px; }
-        button { padding: 25px; font-weight: bold; border: none; border-radius: 12px; font-size: 18px; color: black; active { opacity: 0.7; } }
-        .btn-foto { background-color: #FFD700; }
-        .btn-grabar { background-color: #FF3131; }
-        .btn-vol { background-color: #318CE7; color: white; }
-        .btn-wa { background-color: #25D366; grid-column: span 2; color: white; }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #video-container {
+            position: relative;
+            flex: 1;
+            background: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            cursor: pointer;
+        }
+
+        .status-bar {
+            background: #000;
+            color: #00ff00;
+            text-align: center;
+            padding: 10px;
+            font-weight: bold;
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+
+        .controls-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            padding: 15px;
+            background: #111;
+        }
+
+        button {
+            border: none;
+            padding: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        #btnFoto { background-color: #ffcc00; color: #000; }
+        #btnGrabar { background-color: #ff3b30; }
+        #btnVolMas, #btnVolMenos { background-color: #2b78ff; }
+        #btnWhatsApp { 
+            grid-column: span 2; 
+            background-color: #25d366; 
+            padding: 25px;
+        }
+
+        button:active { opacity: 0.7; transform: scale(0.98); }
     </style>
 </head>
 <body>
 
-    <div id="contenedor-video">
-        <video id="camara" autoplay playsinline muted></video>
+    <div class="status-bar" id="estado">ESTADO: GAFAS ACTIVAS - SAMSUNG A34</div>
+
+    <div id="video-container">
+        <video id="video" autoplay playsinline></video>
     </div>
 
-    <div class="barra-estado" id="estado">ESTADO: INICIANDO...</div>
-
-    <div class="controles">
-        <button class="btn-foto" onclick="capturarFoto()">📸 FOTO</button>
-        <button class="btn-grabar" id="btnRec" onclick="controlarGrabacion()">🎥 GRABAR</button>
-        <button class="btn-vol" onclick="ajustarVolumen(0.1)">VOL +</button>
-        <button class="btn-vol" onclick="ajustarVolumen(-0.1)">VOL -</button>
-        <button class="btn-wa" onclick="mandarWhatsApp()">📤 ENVIAR REPORTE WA</button>
+    <div class="controls-container" id="controles">
+        <button id="btnFoto">📸 FOTO</button>
+        <button id="btnGrabar">🎥 GRABAR</button>
+        <button id="btnVolMas">VOL +</button>
+        <button id="btnVolMenos">VOL -</button>
+        <button id="btnWhatsApp">📲 ENVIAR REPORTE / TRANSMITIR WA</button>
     </div>
 
     <script>
-        const video = document.getElementById('camara');
-        const estado = document.getElementById('estado');
-        let recorder;
-        let clips = [];
+        // --- CONFIGURACIÓN BLUETOOTH (DATOS DE TU LOG/nRF) ---
+        const SERVICE_UUID = 0x1801; 
+        const CHARACTERISTIC_UUID = 0x2A06; // Característica con permiso de WRITE
+        let gafaChar;
 
-        // ARRANCAR CÁMARA TRASERA
-        async function activarCamara() {
+        // --- INICIAR CÁMARA DEL CELULAR (VISOR) ---
+        async function iniciarCamara() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" }, 
-                    audio: true 
-                });
-                video.srcObject = stream;
-                estado.innerText = "ESTADO: HARDWARE CONECTADO";
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                document.getElementById('video').srcObject = stream;
             } catch (err) {
-                estado.innerText = "ERROR: ACCESO DENEGADO";
-                estado.style.color = "red";
+                console.error("Error cámara:", err);
+                document.getElementById('estado').innerText = "ERROR: CÁMARA NO DISPONIBLE";
             }
         }
 
-        function capturarFoto() {
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
-            const data = canvas.toDataURL('image/jpeg');
-            const link = document.createElement('a');
-            link.href = data;
-            link.download = `inspeccion_${Date.now()}.jpg`;
-            link.click();
-            estado.innerText = "ESTADO: FOTO CAPTURADA";
+        // --- CONECTAR GAFAS ---
+        async function conectarGafas() {
+            try {
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'XKOENPRO_282B' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                gafaChar = await service.getCharacteristic(CHARACTERISTIC_UUID);
+                document.getElementById('estado').innerText = "ESTADO: GAFAS VINCULADAS";
+            } catch (err) {
+                console.log("Error BT:", err);
+            }
         }
 
-        function controlarGrabacion() {
-            const btn = document.getElementById('btnRec');
-            if (!recorder || recorder.state === "inactive") {
-                clips = [];
-                recorder = new MediaRecorder(video.srcObject);
-                recorder.ondataavailable = e => clips.push(e.data);
-                recorder.onstop = () => {
-                    const blob = new Blob(clips, { type: 'video/mp4' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `video_${Date.now()}.mp4`;
-                    a.click();
-                };
-                recorder.start();
-                btn.innerText = "🛑 PARAR";
-                estado.innerText = "ESTADO: GRABANDO...";
+        // --- ENVIAR COMANDOS ---
+        async function enviarComando(cmd) {
+            if (gafaChar) {
+                const encoder = new TextEncoder();
+                await gafaChar.writeValue(encoder.encode(cmd));
             } else {
-                recorder.stop();
-                btn.innerText = "🎥 GRABAR";
-                estado.innerText = "ESTADO: VIDEO GUARDADO";
+                console.log("Gafas no conectadas. Comando ignorado: " + cmd);
             }
         }
 
-        function ajustarVolumen(v) {
-            // Sincronización visual del volumen
-            estado.innerText = "VOLUMEN AJUSTADO";
-            setTimeout(() => { estado.innerText = "ESTADO: HARDWARE CONECTADO"; }, 1000);
+        // --- PANTALLA COMPLETA ---
+        function toggleFullscreen() {
+            const elem = document.getElementById('video');
+            if (!document.fullscreenElement) {
+                elem.requestFullscreen().catch(err => console.log(err));
+            } else {
+                document.exitFullscreen();
+            }
         }
 
-        function mandarWhatsApp() {
-            window.open('https://wa.me/?text=Reporte%20de%20inspección%20terminado', '_blank');
-        }
+        // --- VINCULACIÓN DE BOTONES ---
+        document.getElementById('btnFoto').onclick = () => {
+            // Lógica para capturar foto (Canvas) y enviar comando
+            enviarComando('SNAP');
+            alert("Foto capturada");
+        };
 
-        window.onload = activarCamara;
+        document.getElementById('btnGrabar').onclick = () => enviarComando('REC');
+        document.getElementById('btnVolMas').onclick = () => enviarComando('V+');
+        document.getElementById('btnVolMenos').onclick = () => enviarComando('V-');
+
+        document.getElementById('btnWhatsApp').onclick = () => {
+            // Activar pantalla completa para transmisión limpia
+            toggleFullscreen();
+            
+            // Abrir WhatsApp después de un breve delay
+            setTimeout(() => {
+                const msg = encodeURIComponent("Iniciando transmisión técnica. Por favor, mira mi pantalla.");
+                window.open(`https://wa.me/573XXXXXXXXX?text=${msg}`, '_blank');
+            }, 1500);
+        };
+
+        // Doble toque en el video para pantalla completa manual
+        document.getElementById('video').onclick = toggleFullscreen;
+
+        // Auto-inicio
+        iniciarCamara();
+        // Llamar a conectarGafas() mediante un gesto del usuario (requerido por Chrome)
+        document.body.addEventListener('click', () => {
+            if(!gafaChar) conectarGafas();
+        }, {once: true});
+
     </script>
 </body>
 </html>
+
